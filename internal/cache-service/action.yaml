@@ -1,0 +1,8 @@
+name: Identify the runtime cache service
+description: Check whether GitHub REST describes the active cache backend
+outputs:
+  github-cache:
+    description: Whether the runtime endpoint uses GitHub's cache service
+runs:
+  using: node24
+  main: main.cjs

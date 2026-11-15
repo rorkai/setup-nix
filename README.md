@@ -1,6 +1,6 @@
 # setup-nix
 
-Install Nix and select a persistent cache for GitHub Actions. The action uses the NixOS installer and Hestia, with Blacksmith sticky disks on supported Linux runners. Bootstrap uses Bash; a post-job helper uses the runner-provided Node 24 runtime. No additional script runtime is downloaded.
+Install Nix and select a persistent cache for GitHub Actions. The action uses the NixOS installer and Hestia, with Blacksmith sticky disks on supported Linux runners. Setup uses Bash and the runner-provided Node 24 runtime. No additional script runtime is downloaded.
 
 ```yaml
 permissions:
@@ -13,7 +13,7 @@ steps:
   - run: nix flake check
 ```
 
-Pin the action to a reviewed commit. `actions: read` lets Hestia detect evicted cache packs upfront; the cache itself uses the runner's cache token.
+Pin the action to a reviewed commit. On GitHub's cache service, `actions: read` lets Hestia detect evicted cache packs upfront; the cache itself uses the runner's cache token. Separate runtime cache proxies use Hestia's lazy pack lookup because GitHub's REST inventory cannot describe their contents.
 
 | Runner | Automatic backend | Garbage collection |
 |---|---|---|
