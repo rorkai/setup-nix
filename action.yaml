@@ -19,7 +19,7 @@ inputs:
     default: ''
   sticky-gc-threshold:
     description: Trim a writable sticky store above this usage percentage; zero disables trimming
-    default: '50'
+    default: '0'
   extra-conf:
     description: Additional non-secret Nix configuration
     default: ''

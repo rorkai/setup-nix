@@ -19,7 +19,7 @@ Pin the action to a reviewed commit. On GitHub's cache service, `actions: read` 
 |---|---|---|
 | GitHub Linux | Hestia | Repository GC workflow |
 | GitHub macOS | Hestia | Repository GC workflow |
-| Blacksmith Linux with sticky disk support | Sticky `/nix` | Local store trimming |
+| Blacksmith Linux with sticky disk support | Sticky `/nix` | Optional local store trimming |
 | Blacksmith macOS | Hestia | Blacksmith cache eviction |
 
 Automatic detection uses Linux plus `BLACKSMITH_STICKY_DISK_GRPC_PORT`, not runner names. The pinned installer supports Linux x64/ARM64 and macOS ARM64. Intel macOS and Windows are unsupported.
@@ -32,7 +32,7 @@ Automatic detection uses Linux plus `BLACKSMITH_STICKY_DISK_GRPC_PORT`, not runn
 | `save` | `true` | Permit cache writes within the event's allowed scope. |
 | `cache-scope` | empty | Separate sticky disks for matrix entries sharing one job ID. |
 | `sticky-key` | repository, architecture, job and scope | Set a base key, for example when borrowing another job's disk. |
-| `sticky-gc-threshold` | `50` | Trim a writable sticky store above this usage percentage. `0` disables trimming. |
+| `sticky-gc-threshold` | `0` | Opt into trimming a writable sticky store above this usage percentage. `0` disables trimming. |
 | `extra-conf` | empty | Additional public Nix settings. |
 | `github-token` | `github.token` | Configure authenticated Nix GitHub fetches. Empty disables this configuration. |
 | `installer-version` | `2.35.4` | Pin the NixOS installer release. |
@@ -49,11 +49,11 @@ Sticky snapshots commit only on the default branch, excluding pull-request event
 
 The disk key includes an installer-version and configuration suffix. Existing single-user Nix caches therefore remain untouched when migrating to this multi-user installer. Installer or public configuration changes select a fresh disk, which must warm again. A `sticky-key` override changes the base, not this suffix.
 
-Only `/nix` persists. Installation is replayed on each host so build users and host configuration are recreated. The Nix fetcher cache also lives under `/nix`, avoiding repeated flake-input downloads.
+Only `/nix` persists. Installation is replayed on each host so build users and host configuration are recreated. Each runner user's Nix fetcher cache lives under `/nix/var/cache/nix/per-user/<uid>`, separate from the daemon's privileged cache and locks, avoiding repeated flake-input downloads.
 
 The action owns daemon teardown: its post-job helper stops the daemon before Blacksmith unmounts and commits the disk. The helper uses GitHub's `$/` reference to run code from the same reviewed action commit.
 
-Local trimming runs before builds only when the disk may be committed and exceeds its threshold. It honours Nix GC roots. The action prepares `/nix/var/nix/gcroots/per-user/$(id -un)` for the runner. Put build artifacts that must survive trimming there; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Trimming also clears the fetcher cache so the next invocation repopulates it.
+Blacksmith store trimming is disabled by default. Opt in with `sticky-gc-threshold: '50'`, for example, to trim before builds only when the disk may be committed and exceeds 50% usage. It honours Nix GC roots. The action prepares `/nix/var/nix/gcroots/per-user/$(id -un)` for the runner. Put build artifacts that must survive trimming there; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Opt-in trimming also clears the fetcher cache so the next invocation repopulates it.
 
 ## Hestia garbage collection
 
