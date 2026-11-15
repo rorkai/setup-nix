@@ -1,0 +1,6 @@
+name: Sticky Nix daemon lifecycle
+description: Release the Nix daemon before the persistent store is unmounted
+runs:
+  using: node24
+  main: main.cjs
+  post: post.cjs
