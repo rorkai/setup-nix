@@ -17,6 +17,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-    uses: ./.github/workflows/gc.yml
+    uses: ./.github/workflows/gc.yaml
     with:
       dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}

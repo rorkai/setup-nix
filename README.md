@@ -71,7 +71,7 @@ jobs:
     permissions:
       actions: write
       contents: read
-    uses: x-ryoppippi/setup-nix/.github/workflows/gc.yml@<full-commit-sha>
+    uses: x-ryoppippi/setup-nix/.github/workflows/gc.yaml@<full-commit-sha>
 ```
 
 The reusable workflow runs only on the caller's default branch, serialises GC runs, and supports `with: { dry-run: true }`. One Linux GC job handles the repository's Hestia cache roots, including macOS builds. It runs on `ubuntu-slim` with its 15-minute limit. It does not mount, trim or delete Blacksmith sticky snapshots.
