@@ -84,7 +84,10 @@ runs:
       with:
         installer-version: ${{ inputs.installer-version }}
         extra-conf: ${{ inputs.extra-conf }}
-        init: ${{ steps.prepare.outputs.backend == 'sticky' && 'no' || 'auto' }}
+
+    - name: Own the sticky store daemon lifecycle
+      if: steps.prepare.outputs.backend == 'sticky'
+      uses: $/internal/sticky-lifecycle
 
     - name: Configure GitHub authentication
       shell: bash

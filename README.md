@@ -1,6 +1,6 @@
 # setup-nix
 
-Install Nix and select a persistent cache for GitHub Actions. The action uses the NixOS installer and Hestia, with Blacksmith sticky disks on supported Linux runners. It needs no additional script runtime.
+Install Nix and select a persistent cache for GitHub Actions. The action uses the NixOS installer and Hestia, with Blacksmith sticky disks on supported Linux runners. Bootstrap uses Bash; a post-job helper uses the runner-provided Node 24 runtime. No additional script runtime is downloaded.
 
 ```yaml
 permissions:
@@ -50,6 +50,8 @@ Sticky snapshots commit only on the default branch, excluding pull-request event
 The disk key includes an installer-version and configuration suffix. Existing single-user Nix caches therefore remain untouched when migrating to this multi-user installer. Installer or public configuration changes select a fresh disk, which must warm again. A `sticky-key` override changes the base, not this suffix.
 
 Only `/nix` persists. Installation is replayed on each host so build users and host configuration are recreated. The Nix fetcher cache also lives under `/nix`, avoiding repeated flake-input downloads.
+
+The action owns daemon teardown: its post-job helper stops the daemon before Blacksmith unmounts and commits the disk. The helper uses GitHub's `$/` reference to run code from the same reviewed action commit.
 
 Local trimming runs before builds only when the disk may be committed and exceeds its threshold. It honours Nix GC roots. Put build artifacts that must survive trimming under `/nix/var/nix/gcroots`; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Trimming also clears the fetcher cache so the next invocation repopulates it.
 
