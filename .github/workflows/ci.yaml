@@ -45,8 +45,9 @@ jobs:
         run: |
           test "$ACTUAL" = "$EXPECTED"
           if [[ "$ACTUAL" == sticky ]]; then
-            sudo install -d -o "$(id -un)" -g "$(id -gn)" /nix/var/nix/gcroots/setup-nix-smoke
-            out_link=/nix/var/nix/gcroots/setup-nix-smoke/result
+            roots="/nix/var/nix/gcroots/per-user/$(id -un)/setup-nix-smoke"
+            mkdir -p "$roots"
+            out_link="$roots/result"
           else
             out_link=result
           fi

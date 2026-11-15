@@ -53,7 +53,7 @@ Only `/nix` persists. Installation is replayed on each host so build users and h
 
 The action owns daemon teardown: its post-job helper stops the daemon before Blacksmith unmounts and commits the disk. The helper uses GitHub's `$/` reference to run code from the same reviewed action commit.
 
-Local trimming runs before builds only when the disk may be committed and exceeds its threshold. It honours Nix GC roots. Put build artifacts that must survive trimming under `/nix/var/nix/gcroots`; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Trimming also clears the fetcher cache so the next invocation repopulates it.
+Local trimming runs before builds only when the disk may be committed and exceeds its threshold. It honours Nix GC roots. The action prepares `/nix/var/nix/gcroots/per-user/$(id -un)` for the runner. Put build artifacts that must survive trimming there; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Trimming also clears the fetcher cache so the next invocation repopulates it.
 
 ## Hestia garbage collection
 
@@ -80,7 +80,7 @@ The reusable workflow runs only on the caller's default branch, serialises GC ru
 
 CI runs real installation and build jobs on GitHub and Blacksmith Linux/macOS runners, plus a no-init `ubuntu-slim` job. On `main`, a subsequent job verifies cache reuse on a fresh runner. Cache GC is exercised in dry-run mode. Runtime compatibility is established by those jobs, not simulated installer execution on a developer's machine.
 
-tagpr maintains release pull requests and creates tags after they merge.
+tagpr maintains release pull requests and creates tags after they merge. Versions live in Git tags, without a separate version file.
 
 ## Licence
 
