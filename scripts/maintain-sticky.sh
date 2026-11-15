@@ -14,6 +14,5 @@ if [[ "$CACHE_WRITABLE" == true && "$GC_THRESHOLD" != 0 ]]; then
 fi
 sudo install -d -m 0755 -o root -g root "$cache_root"
 sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" "$cache_dir"
-# Installer replay resets nested cache ownership; per-user GC roots are excluded.
 sudo chown -hR "$(id -un):$(id -gn)" "$cache_dir"
 printf 'NIX_CACHE_HOME=%s\n' "$cache_dir" >> "$GITHUB_ENV"
