@@ -93,8 +93,6 @@ runs:
       run: |
         sudo install -d -m 0755 -o "$(id -un)" -g "$(id -gn)" \
           "/nix/var/nix/gcroots/per-user/$(id -un)"
-        sudo chown -hR "$(id -un):$(id -gn)" \
-          "/nix/var/nix/gcroots/per-user/$(id -un)"
 
     - name: Own the sticky store daemon lifecycle
       if: steps.prepare.outputs.backend == 'sticky'
