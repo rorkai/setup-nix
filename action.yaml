@@ -75,6 +75,9 @@ runs:
       if: steps.prepare.outputs.backend == 'sticky'
       shell: bash
       run: |
+        # A multi-user store must be rooted in a privileged directory for
+        # systemd-tmpfiles to provision it safely on the new host.
+        sudo chown root:root /nix
         # The snapshot contains /nix, but the host users, configuration and
         # services must be provisioned again rather than skipped by its receipt.
         sudo rm -f /nix/receipt.json /nix/var/nix/daemon-socket/socket
