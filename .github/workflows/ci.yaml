@@ -79,6 +79,7 @@ jobs:
           package="$(nix eval --raw ".#packages.$system.smoke.outPath")"
           if [[ "$BACKEND" == sticky ]]; then
             nix path-info "$package"
+            nix build .#smoke --out-link "/nix/var/nix/gcroots/per-user/$(id -un)/setup-nix-smoke/result"
           else
             nix path-info --store "http://$HESTIA_LISTEN?trusted=true" "$package"
           fi
