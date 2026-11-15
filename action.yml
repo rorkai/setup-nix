@@ -1,0 +1,110 @@
+name: Setup Nix
+description: Install Nix with an automatically selected persistent cache
+author: ryoppippi
+branding:
+  icon: package
+  color: blue
+inputs:
+  cache:
+    description: Cache backend (auto, sticky, hestia or none)
+    default: auto
+  save:
+    description: Allow cache writes within the event's permitted scope
+    default: 'true'
+  cache-scope:
+    description: Separate sticky disks for matrix entries within one job
+    default: ''
+  sticky-key:
+    description: Sticky disk base key; an installer configuration suffix is added
+    default: ''
+  sticky-gc-threshold:
+    description: Trim a writable sticky store above this usage percentage; zero disables trimming
+    default: '50'
+  extra-conf:
+    description: Additional non-secret Nix configuration
+    default: ''
+  github-token:
+    description: Token for Nix GitHub fetches; empty disables this configuration
+    default: ${{ github.token }}
+  installer-version:
+    description: Pinned NixOS installer release
+    default: 2.35.4
+outputs:
+  backend:
+    description: Selected cache backend
+    value: ${{ steps.prepare.outputs.backend }}
+  cache-writable:
+    description: Whether this invocation may persist cache state
+    value: ${{ steps.prepare.outputs.writable }}
+  sticky-key:
+    description: Fully qualified sticky disk key, or empty for other backends
+    value: ${{ steps.prepare.outputs.sticky-key }}
+runs:
+  using: composite
+  steps:
+    - name: Select cache backend
+      id: prepare
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        CACHE: ${{ inputs.cache }}
+        SAVE: ${{ inputs.save }}
+        CACHE_SCOPE: ${{ inputs.cache-scope }}
+        STICKY_KEY: ${{ inputs.sticky-key }}
+        GC_THRESHOLD: ${{ inputs.sticky-gc-threshold }}
+        EXTRA_CONF: ${{ inputs.extra-conf }}
+        INSTALLER_VERSION: ${{ inputs.installer-version }}
+        DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        CURRENT_REF: ${{ github.ref }}
+        EVENT_NAME: ${{ github.event_name }}
+        REPOSITORY: ${{ github.repository }}
+        JOB_ID: ${{ github.job }}
+        RUNNER_OS: ${{ runner.os }}
+        RUNNER_ARCH: ${{ runner.arch }}
+      run: bash "$ACTION_PATH/scripts/prepare.sh"
+
+    - name: Mount sticky Nix store
+      if: steps.prepare.outputs.backend == 'sticky'
+      uses: useblacksmith/stickydisk@3f6be1451e3cad893b778bc93495c80452a5da26 # v1.7.2
+      with:
+        key: ${{ steps.prepare.outputs.sticky-key }}
+        path: /nix
+        commit: ${{ steps.prepare.outputs.writable }}
+
+    - name: Prepare the restored store for this host
+      if: steps.prepare.outputs.backend == 'sticky'
+      shell: bash
+      run: |
+        # The snapshot contains /nix, but the host users, configuration and
+        # services must be provisioned again rather than skipped by its receipt.
+        sudo rm -f /nix/receipt.json /nix/var/nix/daemon-socket/socket
+
+    - name: Install Nix
+      uses: NixOS/nix-installer-action@62c1943b776c509394b550f3f983adc14e9212d6 # v1.0.0
+      with:
+        installer-version: ${{ inputs.installer-version }}
+        extra-conf: ${{ inputs.extra-conf }}
+        init: ${{ steps.prepare.outputs.backend == 'sticky' && 'no' || 'auto' }}
+
+    - name: Configure GitHub authentication
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: bash "$ACTION_PATH/scripts/authenticate.sh"
+
+    - name: Start Hestia binary cache
+      if: steps.prepare.outputs.backend == 'hestia'
+      uses: Mic92/hestia@dfed9ced335d28978ba74e513939a10db1f71025 # v3.1.0
+      with:
+        version: v3.1.0
+        read-only: ${{ steps.prepare.outputs.writable != 'true' }}
+
+    - name: Maintain sticky store
+      if: steps.prepare.outputs.backend == 'sticky'
+      shell: bash
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+        CACHE_WRITABLE: ${{ steps.prepare.outputs.writable }}
+        GC_THRESHOLD: ${{ inputs.sticky-gc-threshold }}
+      run: bash "$ACTION_PATH/scripts/maintain-sticky.sh"

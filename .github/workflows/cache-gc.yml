@@ -1,0 +1,22 @@
+name: Daily cache maintenance
+
+on:
+  schedule:
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: Plan without changing or deleting cached data
+        type: boolean
+        default: true
+
+permissions: {}
+
+jobs:
+  gc:
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/gc.yml
+    with:
+      dry-run: ${{ github.event_name == 'workflow_dispatch' && inputs.dry-run }}

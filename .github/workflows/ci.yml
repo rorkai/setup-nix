@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  seed:
+    name: Build (${{ matrix.id }})
+    strategy:
+      fail-fast: false
+      matrix: &runners
+        include:
+          - id: github-linux
+            runner: ubuntu-latest
+            backend: hestia
+          - id: github-macos
+            runner: macos-latest
+            backend: hestia
+          - id: blacksmith-linux
+            runner: blacksmith-4vcpu-ubuntu-2404
+            backend: sticky
+          - id: blacksmith-macos
+            runner: blacksmith-12vcpu-macos-26
+            backend: hestia
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./
+        with:
+          sticky-key: ${{ github.repository }}-e2e-${{ matrix.id }}
+      - name: Verify selected backend and build
+        env:
+          EXPECTED: ${{ matrix.backend }}
+          ACTUAL: ${{ steps.setup.outputs.backend }}
+        run: |
+          test "$ACTUAL" = "$EXPECTED"
+          if [[ "$ACTUAL" == sticky ]]; then
+            sudo install -d -o "$(id -un)" -g "$(id -gn)" /nix/var/nix/gcroots/setup-nix-smoke
+            out_link=/nix/var/nix/gcroots/setup-nix-smoke/result
+          else
+            out_link=result
+          fi
+          nix build .#smoke --out-link "$out_link"
+          "$out_link/bin/setup-nix-smoke"
+
+  restore:
+    name: Restore (${{ matrix.id }})
+    needs: seed
+    if: github.ref == 'refs/heads/main'
+    strategy:
+      fail-fast: false
+      matrix: *runners
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./
+        with:
+          sticky-key: ${{ github.repository }}-e2e-${{ matrix.id }}
+      - name: Verify cross-job cache reuse
+        env:
+          BACKEND: ${{ steps.setup.outputs.backend }}
+        run: |
+          system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+          package="$(nix eval --raw ".#packages.$system.smoke.outPath")"
+          if [[ "$BACKEND" == sticky ]]; then
+            nix path-info "$package"
+          else
+            nix path-info --store "http://$HESTIA_LISTEN?trusted=true" "$package"
+          fi
+          nix run .#smoke
+
+  no-init:
+    runs-on: ubuntu-slim
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - id: setup
+        uses: ./
+        with:
+          cache: none
+      - name: Verify a no-init runner
+        env:
+          BACKEND: ${{ steps.setup.outputs.backend }}
+        run: |
+          test "$BACKEND" = none
+          nix run .#smoke
+
+  gc-dry-run:
+    permissions:
+      actions: write
+      contents: read
+    uses: ./.github/workflows/gc.yml
+    with:
+      dry-run: true

@@ -1,0 +1,85 @@
+# setup-nix
+
+Install Nix and select a persistent cache for GitHub Actions. The action uses the NixOS installer and Hestia, with Blacksmith sticky disks on supported Linux runners. It needs no additional script runtime.
+
+```yaml
+permissions:
+  contents: read
+  actions: read
+
+steps:
+  - uses: actions/checkout@v7
+  - uses: x-ryoppippi/setup-nix@<full-commit-sha>
+  - run: nix flake check
+```
+
+Pin the action to a reviewed commit. `actions: read` lets Hestia detect evicted cache packs upfront; the cache itself uses the runner's cache token.
+
+| Runner | Automatic backend | Garbage collection |
+|---|---|---|
+| GitHub Linux | Hestia | Repository GC workflow |
+| GitHub macOS | Hestia | Repository GC workflow |
+| Blacksmith Linux with sticky disk support | Sticky `/nix` | Local store trimming |
+| Blacksmith macOS | Hestia | Repository GC workflow |
+
+Automatic detection uses Linux plus `BLACKSMITH_STICKY_DISK_GRPC_PORT`, not runner names. The pinned installer supports Linux x64/ARM64 and macOS ARM64. Intel macOS and Windows are unsupported.
+
+## Configuration
+
+| Input | Default | Purpose |
+|---|---|---|
+| `cache` | `auto` | Select `auto`, `sticky`, `hestia` or `none`. Explicit `sticky` requires a supported runner. |
+| `save` | `true` | Permit cache writes within the event's allowed scope. |
+| `cache-scope` | empty | Separate sticky disks for matrix entries sharing one job ID. |
+| `sticky-key` | repository, architecture, job and scope | Set a base key, for example when borrowing another job's disk. |
+| `sticky-gc-threshold` | `50` | Trim a writable sticky store above this usage percentage. `0` disables trimming. |
+| `extra-conf` | empty | Additional public Nix settings. |
+| `github-token` | `github.token` | Configure authenticated Nix GitHub fetches. Empty disables this configuration. |
+| `installer-version` | `2.35.4` | Pin the NixOS installer release. |
+
+Outputs are `backend`, `cache-writable` and `sticky-key` (the fully qualified disk key).
+
+The installer already sets `max-jobs = auto`. No extra build or transfer concurrency settings are needed by default.
+
+The installer logs its `extra-conf` input. Pass credentials through `github-token`, which this action reads from the environment and writes silently into a private user configuration file. Access-token settings in `extra-conf` are rejected.
+
+## Sticky disks
+
+Sticky snapshots commit only on the default branch, excluding pull-request events, and only when `save` permits it. Other runs consume a snapshot without committing their changes. Hestia writes are branch-scoped; `pull_request_target` remains read-only.
+
+The disk key includes an installer-version and configuration suffix. Existing single-user Nix caches therefore remain untouched when migrating to this multi-user installer. Installer or public configuration changes select a fresh disk, which must warm again. A `sticky-key` override changes the base, not this suffix.
+
+Only `/nix` persists. Installation is replayed on each host so build users and host configuration are recreated. The Nix fetcher cache also lives under `/nix`, avoiding repeated flake-input downloads.
+
+Local trimming runs before builds only when the disk may be committed and exceeds its threshold. It honours Nix GC roots. Put build artifacts that must survive trimming under `/nix/var/nix/gcroots`; workspace out-links disappear between runs. Keep `keep-derivations` and `keep-outputs` enabled in `extra-conf` when build-time closures must survive. Trimming also clears the fetcher cache so the next invocation repopulates it.
+
+## Hestia garbage collection
+
+Add a daily caller workflow to each repository:
+
+```yaml
+name: Cache GC
+on:
+  schedule:
+    - cron: '41 4 * * *'
+  workflow_dispatch:
+permissions: {}
+jobs:
+  gc:
+    permissions:
+      actions: write
+      contents: read
+    uses: x-ryoppippi/setup-nix/.github/workflows/gc.yml@<full-commit-sha>
+```
+
+The reusable workflow runs only on the caller's default branch, serialises GC runs, and supports `with: { dry-run: true }`. One Linux GC job handles the repository's Hestia cache roots, including macOS builds. It runs on `ubuntu-slim` with its 15-minute limit. It does not mount, trim or delete Blacksmith sticky snapshots.
+
+## Validation and releases
+
+CI runs real installation and build jobs on GitHub and Blacksmith Linux/macOS runners, plus a no-init `ubuntu-slim` job. On `main`, a subsequent job verifies cache reuse on a fresh runner. Cache GC is exercised in dry-run mode. Runtime compatibility is established by those jobs, not simulated installer execution on a developer's machine.
+
+tagpr maintains release pull requests and creates tags after they merge.
+
+## Licence
+
+MIT.
