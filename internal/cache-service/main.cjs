@@ -1,7 +1,8 @@
 const fs = require('node:fs');
 
 const endpoint = process.env.ACTIONS_RESULTS_URL;
-const githubCache = endpoint
+const blacksmith = Object.entries(process.env).some(([key, value]) => key.startsWith('BLACKSMITH_') && value);
+const githubCache = endpoint && !blacksmith
   ? new URL(endpoint).hostname.endsWith('.actions.githubusercontent.com')
   : false;
 

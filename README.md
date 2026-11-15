@@ -20,7 +20,7 @@ Pin the action to a reviewed commit. On GitHub's cache service, `actions: read` 
 | GitHub Linux | Hestia | Repository GC workflow |
 | GitHub macOS | Hestia | Repository GC workflow |
 | Blacksmith Linux with sticky disk support | Sticky `/nix` | Local store trimming |
-| Blacksmith macOS | Hestia | Repository GC workflow |
+| Blacksmith macOS | Hestia | Blacksmith cache eviction |
 
 Automatic detection uses Linux plus `BLACKSMITH_STICKY_DISK_GRPC_PORT`, not runner names. The pinned installer supports Linux x64/ARM64 and macOS ARM64. Intel macOS and Windows are unsupported.
 
@@ -74,7 +74,9 @@ jobs:
     uses: x-ryoppippi/setup-nix/.github/workflows/gc.yaml@<full-commit-sha>
 ```
 
-The reusable workflow runs only on the caller's default branch, serialises GC runs, and supports `with: { dry-run: true }`. One Linux GC job handles the repository's Hestia cache roots, including macOS builds. It runs on `ubuntu-slim` with its 15-minute limit. It does not mount, trim or delete Blacksmith sticky snapshots.
+The reusable workflow runs only on the caller's default branch, serialises GC runs, and supports `with: { dry-run: true }`. One GitHub Linux GC job handles the repository's GitHub-hosted Hestia cache roots, including macOS builds. It runs on `ubuntu-slim` with its 15-minute limit. It does not mount, trim or delete Blacksmith sticky snapshots.
+
+Blacksmith redirects runtime caches to its own service, so GitHub REST cannot safely enumerate or delete those Hestia packs. The GC workflow stays on GitHub's cache service. Blacksmith-backed Hestia caches rely on [Blacksmith's LRU eviction policy](https://docs.blacksmith.sh/blacksmith-caching/dependencies-actions); their Hestia metadata is not compacted by this workflow. Cache-service detection excludes Blacksmith environments and unrecognised runtime endpoints from REST-based eviction checks.
 
 ## Validation and releases
 

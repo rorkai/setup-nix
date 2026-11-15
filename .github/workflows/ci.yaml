@@ -53,6 +53,13 @@ jobs:
           fi
           nix build .#smoke --out-link "$out_link"
           "$out_link/bin/setup-nix-smoke"
+      - name: Inspect failed sticky cache permissions
+        if: failure() && steps.setup.outputs.backend == 'sticky'
+        run: |
+          id
+          sudo stat -c '%n uid=%u gid=%g mode=%a' \
+            /nix/var/cache/nix /nix/var/cache/nix/fetcher-locks \
+            /nix/var/cache/nix/fetcher-locks/*.lock
 
   restore:
     name: Restore (${{ matrix.id }})
